@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: mart_category_share_monthly
+    description: Category share of monthly GMV, rank within the month, and month-over-month growth.
+    data_tests:
+      - expression_is_true:
+          arguments:
+            expression: "gmv_share between 0 and 1"
+    columns:
+      - name: gmv_share
+        description: Category GMV divided by all-category GMV for the same month.
+
+  - name: mart_category_price_bands
+    description: Units, GMV, lateness and review score by category and item price band.
+    columns:
+      - name: price_band
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['1: <25', '2: 25-49', '3: 50-99', '4: 100-249', '5: 250+']
+
+  - name: mart_seller_performance
+    description: One row per seller with volume, delivery, review and cancellation metrics.
+    columns:
+      - name: seller_id
+        data_tests: [unique, not_null]
+
+  - name: mart_delivery_review_impact
+    description: Review score and low-review rate by delivery timing versus the promised date.
+    columns:
+      - name: delivery_bucket
+        data_tests: [unique, not_null]

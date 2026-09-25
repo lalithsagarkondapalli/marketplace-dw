@@ -20,3 +20,8 @@ test:
 	$(PY) -m pytest -q tests
 
 all: load dbt test
+
+.PHONY: stream
+# Streaming demo on the file source: two runs, simulated crash replay, verification.
+stream:
+	PY=$(PY) bash streaming/run_demo.sh
