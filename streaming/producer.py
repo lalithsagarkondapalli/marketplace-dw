@@ -78,17 +78,45 @@ def to_files(arrivals, out: Path, per_file: int, start: int, stop: int | None):
     return len(chunks), stop
 
 
-def to_kafka(arrivals, bootstrap: str, topic: str):
-    from confluent_kafka import Producer
+def to_kafka(arrivals, bootstrap: str, topic: str, broker_wait_s: int = 90):
+    import time
+    from confluent_kafka import KafkaException, Producer
+    from confluent_kafka.admin import AdminClient, NewTopic
+
+    # Wait for the broker to accept metadata requests, then make sure the topic exists
+    # with a single partition so message order is preserved end to end.
+    admin = AdminClient({"bootstrap.servers": bootstrap})
+    deadline = time.time() + broker_wait_s
+    while True:
+        try:
+            topics = admin.list_topics(timeout=5).topics
+            break
+        except KafkaException:
+            if time.time() > deadline:
+                raise
+            time.sleep(2)
+    if topic not in topics:
+        for fut in admin.create_topics([NewTopic(topic, num_partitions=1, replication_factor=1)]).values():
+            fut.result()
+
+    failed = []
+    def on_delivery(err, _msg):
+        if err is not None:
+            failed.append(err)
+
     producer = Producer({"bootstrap.servers": bootstrap, "linger.ms": 20, "acks": "all",
                          "enable.idempotence": True})
-    for i, a in enumerate(arrivals):
-        producer.produce(topic, a[2].encode())
-        if i % 10000 == 0:
-            producer.poll(0)
-    remaining = producer.flush(60)
-    if remaining:
-        raise RuntimeError(f"{remaining} messages not delivered to Kafka")
+    for a in arrivals:
+        while True:
+            try:
+                producer.produce(topic, a[2].encode(), on_delivery=on_delivery)
+                break
+            except BufferError:
+                producer.poll(0.5)  # local queue full: let deliveries drain (backpressure)
+        producer.poll(0)
+    remaining = producer.flush(120)
+    if remaining or failed:
+        raise RuntimeError(f"{remaining} undelivered, {len(failed)} failed deliveries: {failed[:3]}")
 
 
 def main():
