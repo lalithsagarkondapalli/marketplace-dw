@@ -1,0 +1,59 @@
+version: 2
+
+models:
+  - name: stg_orders
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: purchased_at
+        data_tests: [not_null]
+      - name: order_status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [delivered, shipped, canceled, unavailable, invoiced,
+                         processing, created, approved]
+  - name: stg_order_items
+    columns:
+      - name: order_item_key
+        data_tests: [unique, not_null]
+      - name: order_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: item_price
+        data_tests:
+          - not_null
+          - expression_is_true:
+              arguments:
+                expression: "item_price > 0"
+  - name: stg_order_reviews
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: review_score
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+                quote: false
+  - name: stg_customers
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+      - name: customer_unique_id
+        data_tests: [not_null]
+  - name: stg_products
+    columns:
+      - name: product_id
+        data_tests: [unique, not_null]
+  - name: stg_sellers
+    columns:
+      - name: seller_id
+        data_tests: [unique, not_null]
+  - name: stg_geolocation
+    columns:
+      - name: zip_code_prefix
+        data_tests: [unique, not_null]

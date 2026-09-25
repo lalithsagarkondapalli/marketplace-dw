@@ -1,0 +1,29 @@
+name: marketplace_dw
+version: "1.0.0"
+config-version: 2
+profile: marketplace_dw
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "logs"]
+
+models:
+  marketplace_dw:
+    staging:
+      +schema: staging
+      +materialized: view
+    intermediate:
+      +schema: intermediate
+      +materialized: view
+    marts:
+      +schema: marts
+      +materialized: table
+    data_quality:
+      +schema: data_quality
+      +materialized: table
+
+tests:
+  marketplace_dw:
+    +store_failures: false

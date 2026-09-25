@@ -1,0 +1,16 @@
+version: 2
+
+sources:
+  - name: raw
+    description: Untyped copies of the Olist source files, loaded by the Airflow DAG.
+    schema: raw
+    tables:
+      - name: orders
+      - name: order_items
+      - name: order_payments
+      - name: order_reviews
+      - name: customers
+      - name: products
+      - name: sellers
+      - name: category_translation
+      - name: geolocation

@@ -1,0 +1,143 @@
+version: 2
+
+models:
+  - name: dim_date
+    columns:
+      - name: date_key
+        data_tests: [unique, not_null]
+
+  - name: dim_product
+    description: Type 1 product dimension with English category names.
+    columns:
+      - name: product_key
+        data_tests: [unique, not_null]
+      - name: product_id
+        data_tests: [unique, not_null]
+
+  - name: dim_seller
+    description: Type 1 seller dimension enriched with zip-prefix centroid coordinates.
+    columns:
+      - name: seller_key
+        data_tests: [unique, not_null]
+
+  - name: dim_customer
+    description: >
+      SCD Type 2 customer dimension keyed by customer_unique_id. A new version is
+      created when the address on an order differs from the previous order's address.
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - no_overlapping_ranges:
+          arguments:
+            key: customer_unique_id
+            valid_from: valid_from
+            valid_to: valid_to
+    columns:
+      - name: customer_sk
+        data_type: text
+        constraints: [{type: not_null}, {type: primary_key}]
+        data_tests: [unique, not_null]
+      - name: customer_unique_id
+        data_type: text
+        constraints: [{type: not_null}]
+      - name: zip_code_prefix
+        data_type: text
+      - name: city
+        data_type: text
+      - name: state
+        data_type: text
+      - name: valid_from
+        data_type: timestamp
+        constraints: [{type: not_null}]
+      - name: valid_to
+        data_type: timestamp
+      - name: is_current
+        data_type: boolean
+      - name: version_number
+        data_type: bigint
+
+  - name: fct_order_items
+    description: Order-line fact. Grain = one row per (order_id, order_item_seq).
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: order_item_key
+        data_type: text
+        constraints: [{type: not_null}]
+        data_tests: [unique, not_null]
+      - name: order_id
+        data_type: text
+      - name: order_item_seq
+        data_type: integer
+      - name: purchase_date_key
+        data_type: integer
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_date'), field: date_key}
+      - name: product_key
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_product'), field: product_key}
+      - name: seller_key
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_seller'), field: seller_key}
+      - name: customer_sk
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_customer'), field: customer_sk}
+      - name: order_status
+        data_type: text
+      - name: item_price
+        data_type: numeric(12,2)
+      - name: freight_value
+        data_type: numeric(12,2)
+      - name: gross_item_value
+        data_type: numeric(12,2)
+      - name: purchased_at
+        data_type: timestamp
+      - name: _loaded_at
+        data_type: timestamptz
+
+  - name: fct_orders
+    description: Accumulating-snapshot order fact with lifecycle milestones and DQ flags.
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: purchase_date_key
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_date'), field: date_key}
+
+  - name: mart_category_monthly
+    description: Monthly category KPIs for merchandising-style analysis.
+    data_tests:
+      - expression_is_true:
+          arguments:
+            expression: "cancel_rate between 0 and 1 and coalesce(late_delivery_rate, 0) between 0 and 1"
+    columns:
+      - name: orders
+        description: Distinct orders containing at least one item in the category.
+      - name: units_sold
+        description: Order lines in the category, excluding canceled/unavailable orders.
+      - name: gmv
+        description: Sum of item price (excludes freight), excluding canceled/unavailable orders.
+      - name: freight_revenue
+        description: Sum of freight charged on revenue order lines.
+      - name: avg_item_price
+        description: Mean item price across all order lines in the category.
+      - name: late_delivery_rate
+        description: Share of delivered orders that arrived after the estimated delivery date.
+      - name: avg_review_score
+        description: Mean 1-5 review score across orders with a review.
+      - name: cancel_rate
+        description: Share of the category's orders with status canceled.

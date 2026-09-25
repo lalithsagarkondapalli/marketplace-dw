@@ -1,0 +1,6 @@
+version: 2
+models:
+  - name: dq_issues
+    description: One row per record that breaks a data-quality rule, with the rule name.
+  - name: dq_summary
+    description: Failing-row counts per rule for the latest run.

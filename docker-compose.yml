@@ -1,0 +1,39 @@
+services:
+  warehouse:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: warehouse
+      POSTGRES_PASSWORD: warehouse
+      POSTGRES_DB: warehouse
+    ports: ["5432:5432"]
+    volumes:
+      - warehouse-data:/var/lib/postgresql/data
+      - ./docker/init-airflow-db.sql:/docker-entrypoint-initdb.d/init-airflow-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warehouse"]
+      interval: 5s
+      retries: 10
+
+  airflow:
+    build: .
+    command: standalone
+    depends_on:
+      warehouse:
+        condition: service_healthy
+    ports: ["8080:8080"]
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://warehouse:warehouse@warehouse:5432/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/project/dags
+      PYTHONPATH: /opt/project
+      PROJECT_ROOT: /opt/project
+      LANDING_DIR: /opt/project/data/landing
+      DBT_BIN: /opt/airflow/dbt-venv/bin/dbt
+      WAREHOUSE_DSN: host=warehouse port=5432 dbname=warehouse user=warehouse password=warehouse
+      WAREHOUSE_HOST: warehouse
+    volumes:
+      - ./:/opt/project
+
+volumes:
+  warehouse-data:
